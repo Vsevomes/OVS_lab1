@@ -197,8 +197,13 @@ std::vector<double> loadSampleFromFile(const std::string& filename) {
     while (getline(file, line)) {
         if (line.empty()) continue;
         for (char c : line) {
-            if (c == '0' || c == '1') input.push_back(c - '0');
+            if (c == '0' || c == '1') {
+                input.push_back(c - '0');
+                if (c == '0') std::cout << "⬜";
+                if (c == '1') std::cout << "⬛";
+            }
         }
+        std::cout << std::endl;
     }
 
     file.close();
