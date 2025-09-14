@@ -11,6 +11,7 @@ This repository contains a C++ implementation of a neural network designed for p
 
 ## Project Structure
 
+```
 OVS_lab1/
 ├── CMakeLists.txt # Build configuration
 ├── main.cpp # Main application entry point
@@ -22,6 +23,7 @@ OVS_lab1/
 │ ├── train/ # Training samples
 │ └── test/ # Test samples
 └── README.md # Project documentation
+```
 
 ## Requirements
 
