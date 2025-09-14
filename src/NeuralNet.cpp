@@ -10,7 +10,7 @@ NeuralNet::NeuralNet (const std::string& filename, double learn_rate) {
     }
 
     int param;
-    for (size_t i; i < 4; i++) {
+    for (size_t i = 0; i < 4; i++) {
         file >> param;
         topology_.push_back(param);
     }
