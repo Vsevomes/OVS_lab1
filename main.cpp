@@ -1,105 +1,190 @@
 #include <iostream>
 #include <sstream>
+#include <algorithm>
 #include "NeuralNet.h"
 
-#define TARGET_ERROR 0.001
+#define TARGET_ERROR 0.01
 
 struct Sample {
-    std::vector<double> input;  // 49 значений
-    std::vector<double> target; // one-hot вектор [1,0,0] или [0,1,0] или [0,0,1]
+    std::vector<double> input;
+    std::vector<double> target;
 };
 
 std::vector<Sample> loadSamples(const std::string& filename);
+std::vector<double> loadShape(const std::string& filename);
+void menu(std::string prog_name);
 
 int main(int argc, char* argv[]) {
     srand(time(NULL));
 
-    // создаём сеть: 2 входа, 1 скрытый слой по 2 нейрона, 1 выход, learning rate = 0.1
-    NeuralNet net(2, 3, 3, 1);
-
-    std::vector<std::vector<double>> inputs = {{0,0}, {0,1}, {1,0}, {1,1}};
-    std::vector<std::vector<double>> targets = {{0}, {0}, {0}, {1}};
-
-    // параметры обучения по ошибке
-    double err = 1.0;            // начальная ошибка
-    int epoch = 0;
-    int maxEpochs = 100000;      // защита от бесконечного цикла
-
-    // цикл обучения до достижения targetError
-    while (err > TARGET_ERROR && epoch < maxEpochs) {
-        err = 0.0;
-        for (int i = 0; i < inputs.size(); i++) {
-            net.train(inputs[i], targets[i]);
-            std::vector<double> out = net.forward(inputs[i]);
-            err += (targets[i][0] - out[0])*(targets[i][0] - out[0]);
-        }
-        err = err / 2; // средняя ошибка
-        epoch++;
-
-        // вывод прогресса каждые 1000 эпох
-        if (epoch % 1000 == 0) {
-            std::cout << "Epoch " << epoch << ", MSE = " << err << std::endl;
-        }
+    if (argc < 2) {
+        menu(argv[0]);
+        return 1;
     }
 
-    std::cout << "Обучение завершено за " << epoch << " эпох, MSE = " << err << std::endl;
+    std::string mode = argv[1];
 
-    std::string file = "../data/model";
+    if (mode == "train") {
+        if (argc < 7) {
+            std::cerr << "Need more arguments" << std::endl;
+            return 1;
+        }
 
-    // сохраняем обученную модель
-    net.save(file);
+        std::string train_file = argv[2];
+        int num_inputs = std::stoi(argv[3]);
+        int hidden_layers = std::stoi(argv[4]);
+        int neurons_per_layer = std::stoi(argv[5]);
+        int num_outputs = std::stoi(argv[6]);
 
-    // создаём новую сеть и загружаем модель
-    NeuralNet net2(file);
+        NeuralNet net(num_inputs, hidden_layers, neurons_per_layer, num_outputs);
+        
+        std::vector<Sample> samples = loadSamples(train_file);
+        if (samples.empty()) {
+            std::cerr << "No test data" << std::endl;
+            return 1;
+        }
 
-    // проверка работы сети
-    std::cout << "Результаты после загрузки модели:" << std::endl;
-    for (int i = 0; i < inputs.size(); i++) {
-        std::vector<double> out = net2.forward(inputs[i]);
-        std::cout << inputs[i][0] << " AND " << inputs[i][1]
-             << " = " << out[0] << std::endl;
+        // training settings
+        double err = 1.0;         
+        int epoch = 0;
+        int maxEpochs = 100000; 
+
+        // training process
+        while (err > TARGET_ERROR && epoch < maxEpochs) {
+            err = 0.0;
+            for (auto &s : samples) {
+                net.train(s.input, s.target);
+                std::vector<double> out = net.forward(s.input);
+                for (int i = 0; i < 3; i++)
+                    err += (s.target[i] - out[i]) * (s.target[i] - out[i]);
+            }
+            err /= samples.size();
+            epoch++;
+            if (epoch % 1000 == 0) {
+                std::cout << "Epoch " << epoch << ", ERR = " << err << std::endl;
+            }
+        }
+
+        std::cout << "Learning completed for " << epoch << " epochs, ERR = " << err << std::endl;
+
+        std::string save_file = "../data/model";
+
+        net.save(save_file);
+    } else if (mode == "predict") {
+        if (argc < 4) {
+            std::cerr << "Need more arguments" << std::endl;
+            return 1;
+        }
+
+        std::string model_file = argv[2];
+        std::string input_file = argv[3];
+
+        NeuralNet net(model_file);
+
+        std::vector<double> input = loadShape(input_file);
+        if (input.empty()) {
+            std::cerr << "Error: empty data" << std::endl;
+            return 1;
+        }
+
+        // start
+        std::vector<double> out = net.forward(input);
+
+        int predicted = std::max_element(out.begin(), out.end()) - out.begin();
+
+        if (out[0] == out[predicted] && out[predicted] > 0.5) {
+            std::cout << "Shape: circle" << std::endl << "Accuracy: " << out[predicted] << std::endl;
+        }
+        else if (out[1] == out[predicted] && out[predicted] > 0.5) {
+            std::cout << "Shape: rectangle" << std::endl << "Accuracy: " << out[predicted] << std::endl;
+        }
+        else if (out[2] == out[predicted] && out[predicted] > 0.5) {
+            std::cout << "Shape: triangle" << std::endl << "Accuracy: " << out[predicted] << std::endl;
+        }
+        else {
+            std::cout << "Unkown shape" << std::endl;
+        }
+    } else {
+        std::cerr << "Unknown mode: " << mode << std::endl;
+        return 1;
     }
-
     return 0;
 }
 
-// // Считываем данные из файла
-// std::vector<Sample> loadSamples(const std::string& filename) {
-//     std::vector<Sample> samples;
-//     std::ifstream file(filename);
-//     if (!file) {
-//         std::cerr << "Ошибка открытия файла " << filename << std::endl;
-//         return samples;
-//     }
+std::vector<Sample> loadSamples(const std::string& filename) {
+    std::vector<Sample> samples;
+    std::ifstream file(filename);
+    if (!file) {
+        std::cerr << "Erro open test file" << filename << std::endl;
+        return samples;
+    }
 
-//     int num_shapes, num_pixels;
-//     file >> num_shapes >> num_pixels;
-//     std::string line;
-//     getline(file, line); // считываем остаток первой строки
+    int num_shapes, num_pixels;
+    file >> num_shapes >> num_pixels;
+    std::string line;
+    getline(file, line);
 
-//     for (int s = 0; s < num_shapes; s++) {
-//         Sample sample;
-//         sample.input.reserve(num_pixels);
+    int side = static_cast<int>(sqrt(num_pixels));
+    if (side * side != num_pixels) {
+        std::cerr << "Wrong pixel size" << std::endl;
+        return samples;
+    }
 
-//         for (int row = 0; row < 7; row++) {
-//             getline(file, line);
-//             if (line.empty()) {
-//                 row--; // пропускаем пустые строки
-//                 continue;
-//             }
-//             for (char c : line) {
-//                 if (c == '0' || c == '1')
-//                     sample.input.push_back(c - '0');
-//             }
-//         }
+    for (int s = 0; s < num_shapes; s++) {
+        Sample sample;
+        sample.input.reserve(num_pixels);
 
-//         // создаём one-hot вектор для цели
-//         sample.target = {0,0,0};
-//         if (s >= 0 && s <= 2) sample.target[s] = 1;
+        int rowsRead = 0;
+        while (rowsRead < side && getline(file, line)) {
+            if (line.empty()) continue;
+            for (char c : line) {
+                if (c == '0' || c == '1')
+                    sample.input.push_back(c - '0');
+            }
+            rowsRead++;
+        }
 
-//         samples.push_back(sample);
-//     }
+        if (sample.input.size() != num_pixels) {
+            std::cerr << "Wrong number of points in shape" << std::endl;
+            continue;
+        }
 
-//     file.close();
-//     return samples;
-// }
+        sample.target = std::vector<double>(num_shapes, 0.0);
+        if (s >= 0 && s < num_shapes) sample.target[s] = 1.0;
+
+        samples.push_back(sample);
+    }
+
+    file.close();
+    return samples;
+}
+
+std::vector<double> loadShape(const std::string& filename) {
+    std::vector<double> input;
+    std::ifstream file(filename);
+    if (!file) {
+        std::cerr << "Ошибка открытия файла " << filename << std::endl;
+        return input;
+    }
+
+    std::string line;
+    while (getline(file, line)) {
+        if (line.empty()) continue;
+        for (char c : line) {
+            if (c == '0' || c == '1') {
+                input.push_back(c - '0');
+            }
+        }
+    }
+
+    file.close();
+    return input;
+}
+
+void menu(std::string prog_name){
+    std::cerr << "Usage:" << std::endl;
+        std::cerr << "  For train model: " 
+             << prog_name << " train <train_file> <inputs> <hiddenLayers> <neuronsPerLayer> <outputs>" << std::endl;
+        std::cerr << "  For use model: " 
+             << prog_name << " predict <model_file> <input_file>" << std::endl;
+}
