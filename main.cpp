@@ -2,10 +2,18 @@
 #include <filesystem>
 #include <sstream>
 #include <algorithm>
+#include <chrono>
 #include "NeuralNet.h"
 
 #define TARGET_ERROR 0.01
 #define MAX_EPOCHES 1000000
+
+#include <chrono>
+#include <iostream>
+
+using Clock = std::chrono::high_resolution_clock;
+using ms = std::chrono::milliseconds;
+using mc = std::chrono::microseconds;
 
 struct Sample {
     std::vector<double> input;
@@ -50,23 +58,44 @@ int main(int argc, char* argv[]) {
         double err = 1.0;         
         int epoch = 0;
 
+        auto start_train = Clock::now();
+
         // training process
         while (err > TARGET_ERROR && epoch < MAX_EPOCHES) {
             err = 0.0;
             for (auto &s : samples) {
                 net.train(s.input, s.target);
                 std::vector<double> out = net.forward(s.input);
-                for (int i = 0; i < 3; i++)
+                for (int i = 0; i < num_outputs; i++)
                     err += (s.target[i] - out[i]) * (s.target[i] - out[i]);
             }
-            err /= samples.size();
+            err /= 2;
             epoch++;
             if (epoch % 1000 == 0) {
                 std::cout << "Epoch " << epoch << ", ERR = " << err << std::endl;
             }
         }
 
+        // time and memory count section
+        auto end_train = Clock::now();
+        auto duration_train = std::chrono::duration_cast<ms>(end_train - start_train).count();
+
+        auto start_forward = Clock::now();
+        auto out = net.forward(samples[0].input);
+        auto end_forward = Clock::now();
+        auto duration_forward = std::chrono::duration_cast<mc>(end_forward - start_forward).count();
+
+        size_t memory_usage = 0;
+        for (auto &layer : net.layers_) {
+            memory_usage += layer.neurons_.size() * sizeof(Neuron);
+            for (auto &neuron : layer.neurons_)
+                memory_usage += neuron.weights_.size() * sizeof(double);
+        }
+    
         std::cout << "Learning completed for " << epoch << " epochs, ERR = " << err << std::endl;
+        std::cout << "Learning time: " << duration_train << " ms" << std::endl;
+        std::cout << "Network exit time: " << duration_forward << " mc" << std::endl;
+        std::cout << "Memory usage: " << memory_usage << " bites" << std::endl;
 
         std::string save_file = "../data/model";
 
