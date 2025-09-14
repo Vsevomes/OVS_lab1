@@ -1,17 +1,19 @@
 #include <iostream>
+#include <filesystem>
 #include <sstream>
 #include <algorithm>
 #include "NeuralNet.h"
 
 #define TARGET_ERROR 0.01
+#define MAX_EPOCHES 1000000
 
 struct Sample {
     std::vector<double> input;
     std::vector<double> target;
 };
 
-std::vector<Sample> loadSamples(const std::string& filename);
-std::vector<double> loadShape(const std::string& filename);
+std::vector<Sample> loadSamplesFromFolder(const std::string& folder);
+std::vector<double> loadSampleFromFile(const std::string& filename);
 void menu(std::string prog_name);
 
 int main(int argc, char* argv[]) {
@@ -30,7 +32,7 @@ int main(int argc, char* argv[]) {
             return 1;
         }
 
-        std::string train_file = argv[2];
+        std::string train_folder = argv[2];
         int num_inputs = std::stoi(argv[3]);
         int hidden_layers = std::stoi(argv[4]);
         int neurons_per_layer = std::stoi(argv[5]);
@@ -38,7 +40,7 @@ int main(int argc, char* argv[]) {
 
         NeuralNet net(num_inputs, hidden_layers, neurons_per_layer, num_outputs);
         
-        std::vector<Sample> samples = loadSamples(train_file);
+        std::vector<Sample> samples = loadSamplesFromFolder(train_folder);
         if (samples.empty()) {
             std::cerr << "No test data" << std::endl;
             return 1;
@@ -47,10 +49,9 @@ int main(int argc, char* argv[]) {
         // training settings
         double err = 1.0;         
         int epoch = 0;
-        int maxEpochs = 100000; 
 
         // training process
-        while (err > TARGET_ERROR && epoch < maxEpochs) {
+        while (err > TARGET_ERROR && epoch < MAX_EPOCHES) {
             err = 0.0;
             for (auto &s : samples) {
                 net.train(s.input, s.target);
@@ -81,7 +82,7 @@ int main(int argc, char* argv[]) {
 
         NeuralNet net(model_file);
 
-        std::vector<double> input = loadShape(input_file);
+        std::vector<double> input = loadSampleFromFile(input_file);
         if (input.empty()) {
             std::cerr << "Error: empty data" << std::endl;
             return 1;
@@ -92,13 +93,13 @@ int main(int argc, char* argv[]) {
 
         int predicted = std::max_element(out.begin(), out.end()) - out.begin();
 
-        if (out[0] == out[predicted] && out[predicted] > 0.5) {
+        if (out[0] == out[predicted] && out[predicted] > 0.8) {
             std::cout << "Shape: circle" << std::endl << "Accuracy: " << out[predicted] << std::endl;
         }
-        else if (out[1] == out[predicted] && out[predicted] > 0.5) {
+        else if (out[1] == out[predicted] && out[predicted] > 0.8) {
             std::cout << "Shape: rectangle" << std::endl << "Accuracy: " << out[predicted] << std::endl;
         }
-        else if (out[2] == out[predicted] && out[predicted] > 0.5) {
+        else if (out[2] == out[predicted] && out[predicted] > 0.8) {
             std::cout << "Shape: triangle" << std::endl << "Accuracy: " << out[predicted] << std::endl;
         }
         else {
@@ -111,55 +112,48 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
-std::vector<Sample> loadSamples(const std::string& filename) {
+std::vector<Sample> loadSamplesFromFolder(const std::string& folder) {
     std::vector<Sample> samples;
-    std::ifstream file(filename);
-    if (!file) {
-        std::cerr << "Erro open test file" << filename << std::endl;
-        return samples;
-    }
 
-    int num_shapes, num_pixels;
-    file >> num_shapes >> num_pixels;
-    std::string line;
-    getline(file, line);
+    for (const auto& entry : std::filesystem::directory_iterator(folder)) {
+        if (!entry.is_regular_file()) continue;
+        std::string filename = entry.path().string();
 
-    int side = static_cast<int>(sqrt(num_pixels));
-    if (side * side != num_pixels) {
-        std::cerr << "Wrong pixel size" << std::endl;
-        return samples;
-    }
-
-    for (int s = 0; s < num_shapes; s++) {
-        Sample sample;
-        sample.input.reserve(num_pixels);
-
-        int rowsRead = 0;
-        while (rowsRead < side && getline(file, line)) {
-            if (line.empty()) continue;
-            for (char c : line) {
-                if (c == '0' || c == '1')
-                    sample.input.push_back(c - '0');
-            }
-            rowsRead++;
-        }
-
-        if (sample.input.size() != num_pixels) {
-            std::cerr << "Wrong number of points in shape" << std::endl;
+        std::ifstream file(filename);
+        if (!file) {
+            std::cerr << "Open file error" << filename << std::endl;
             continue;
         }
 
-        sample.target = std::vector<double>(num_shapes, 0.0);
-        if (s >= 0 && s < num_shapes) sample.target[s] = 1.0;
+        Sample sample;
 
+        std::string line;
+        if (getline(file, line)) {
+            sample.target.clear();
+            for (char c : line) {
+                if (c == '0' || c == '1') sample.target.push_back(c - '0');
+            }
+        } else {
+            std::cerr << "Empty file" << filename << std::endl;
+            continue;
+        }
+
+        sample.input.clear();
+        while (getline(file, line)) {
+            if (line.empty()) continue;
+            for (char c : line) {
+                if (c == '0' || c == '1') sample.input.push_back(c - '0');
+            }
+        }
+
+        file.close();
         samples.push_back(sample);
     }
 
-    file.close();
     return samples;
 }
 
-std::vector<double> loadShape(const std::string& filename) {
+std::vector<double> loadSampleFromFile(const std::string& filename) {
     std::vector<double> input;
     std::ifstream file(filename);
     if (!file) {
@@ -168,12 +162,13 @@ std::vector<double> loadShape(const std::string& filename) {
     }
 
     std::string line;
+    // skip first target
+    getline(file, line);
+
     while (getline(file, line)) {
         if (line.empty()) continue;
         for (char c : line) {
-            if (c == '0' || c == '1') {
-                input.push_back(c - '0');
-            }
+            if (c == '0' || c == '1') input.push_back(c - '0');
         }
     }
 
@@ -184,7 +179,7 @@ std::vector<double> loadShape(const std::string& filename) {
 void menu(std::string prog_name){
     std::cerr << "Usage:" << std::endl;
         std::cerr << "  For train model: " 
-             << prog_name << " train <train_file> <inputs> <hiddenLayers> <neuronsPerLayer> <outputs>" << std::endl;
+             << prog_name << " train <train_folder> <inputs> <hiddenLayers> <neuronsPerLayer> <outputs>" << std::endl;
         std::cerr << "  For use model: " 
              << prog_name << " predict <model_file> <input_file>" << std::endl;
 }
