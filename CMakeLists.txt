@@ -6,7 +6,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include_directories(include)
 
-# Список исходников
 set(SOURCES
     main.cpp
     src/NeuralNet.cpp
@@ -14,7 +13,6 @@ set(SOURCES
     src/Neuron.cpp
 )
 
-# Создание исполняемого файла
 add_executable(${PROJECT_NAME} ${SOURCES})
 
 # target_link_libraries(${PROJECT_NAME} PRIVATE some_library)
