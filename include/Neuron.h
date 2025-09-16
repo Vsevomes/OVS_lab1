@@ -4,7 +4,6 @@
 #include <vector>
 #include <cmath>
 #include <cstdlib>
-#include <ctime>
 
 inline double sigmoid(double x) {
     return 1.0 / (1.0 + exp(-x));

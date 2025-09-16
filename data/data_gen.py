@@ -19,7 +19,7 @@ def generate_sample(name, postfix, dir):
         f.write('\n')
     f.close()
 
-for i in range(15):
+for i in range(30):
     generate_sample('circle', i, 'train')
     generate_sample('rectangle', i, 'train')
     generate_sample('triangle', i, 'train')

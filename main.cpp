@@ -2,11 +2,12 @@
 #include <filesystem>
 #include <sstream>
 #include <algorithm>
+#include <numeric>
 #include <chrono>
 #include "NeuralNet.h"
 
 #define TARGET_ERROR 0.01
-#define MAX_EPOCHES 1000000
+#define MAX_EPOCHES 100000
 
 #include <chrono>
 #include <iostream>
@@ -23,6 +24,7 @@ struct Sample {
 std::vector<Sample> loadSamplesFromFolder(const std::string& folder);
 std::vector<double> loadSampleFromFile(const std::string& filename);
 void menu(std::string prog_name);
+void drawFigure(std::vector<double>& figure);
 
 int main(int argc, char* argv[]) {
     srand(time(NULL));
@@ -92,9 +94,9 @@ int main(int argc, char* argv[]) {
                 memory_usage += neuron.weights_.size() * sizeof(double);
         }
     
-        std::cout << "Learning completed for " << epoch << " epochs, ERR = " << err << std::endl;
-        std::cout << "Learning time: " << duration_train << " ms" << std::endl;
-        std::cout << "Network exit time: " << duration_forward << " mc" << std::endl;
+        std::cout << "Training completed for " << epoch << " epochs, ERR = " << err << std::endl;
+        std::cout << "Train time: " << duration_train << " ms" << std::endl;
+        std::cout << "Inference time: " << duration_forward << " mcs" << std::endl;
         std::cout << "Memory usage: " << memory_usage << " bites" << std::endl;
 
         std::string save_file = "../data/model";
@@ -107,37 +109,81 @@ int main(int argc, char* argv[]) {
         }
 
         std::string model_file = argv[2];
-        std::string input_file = argv[3];
+        std::string input_folder = argv[3];
 
         NeuralNet net(model_file);
 
-        std::vector<double> input = loadSampleFromFile(input_file);
-        if (input.empty()) {
+        std::vector<Sample> inputs = loadSamplesFromFolder(input_folder);
+        if (inputs.empty()) {
             std::cerr << "Error: empty data" << std::endl;
             return 1;
         }
 
+        int num_outputs = inputs[0].target.size();
+        std::vector<std::vector<int>> confusion(num_outputs, std::vector<int>(num_outputs, 0));
+
         // start
-        std::vector<double> out = net.forward(input);
+        for (auto& i: inputs) {
+            std::vector<double> out = net.forward(i.input);
+            drawFigure(i.input);
 
-        int predicted = std::max_element(out.begin(), out.end()) - out.begin();
+            int predicted = std::max_element(out.begin(), out.end()) - out.begin();
+            int actual    = std::max_element(i.target.begin(), i.target.end()) - i.target.begin();
 
-        if (out[0] == out[predicted] && out[predicted] > 0.8) {
-            std::cout << "Shape: circle" << std::endl << "Accuracy: " << out[predicted] << std::endl;
+            confusion[actual][predicted]++;
+
+            if (predicted == 0) {
+                std::cout << "Shape: circle (p=" << out[predicted] << ")" << std::endl;
+            }
+            else if (predicted == 1) {
+                std::cout << "Shape: rectangle (p=" << out[predicted] << ")" << std::endl;
+            }
+            else if (predicted == 2) {
+                std::cout << "Shape: triangle (p=" << out[predicted] << ")" << std::endl;
+            }
+            else {
+                std::cout << "Unknown shape" << std::endl;
+            }
+
+            std::cout << std::endl;
         }
-        else if (out[1] == out[predicted] && out[predicted] > 0.8) {
-            std::cout << "Shape: rectangle" << std::endl << "Accuracy: " << out[predicted] << std::endl;
+
+        // metrics
+        int total = 0, correct = 0;
+        for (int i = 0; i < num_outputs; i++) {
+            total += std::accumulate(confusion[i].begin(), confusion[i].end(), 0);
+            correct += confusion[i][i];
         }
-        else if (out[2] == out[predicted] && out[predicted] > 0.8) {
-            std::cout << "Shape: triangle" << std::endl << "Accuracy: " << out[predicted] << std::endl;
-        }
-        else {
-            std::cout << "Unkown shape" << std::endl;
+
+        double accuracy = (total > 0) ? (double)correct / total : 0.0;
+        std::cout << "Accuracy: " << accuracy << std::endl;
+
+        for (int c = 0; c < num_outputs; c++) {
+            int TP = confusion[c][c];
+            int FP = 0, FN = 0;
+
+            for (int j = 0; j < num_outputs; j++) {
+                if (j != c) {
+                    FP += confusion[j][c];
+                    FN += confusion[c][j];
+                }
+            }
+
+            double precision = (TP + FP) ? (double)TP / (TP + FP) : 0.0;
+            double recall    = (TP + FN) ? (double)TP / (TP + FN) : 0.0;
+            double f1        = (precision + recall) ? 2 * (precision * recall) / (precision + recall) : 0.0;
+
+            std::cout << "Class " << c 
+                      << " -> Precision: " << precision 
+                      << ", Recall: " << recall 
+                      << ", F1-score: " << f1 
+                      << std::endl;
         }
     } else {
         std::cerr << "Unknown mode: " << mode << std::endl;
         return 1;
     }
+
     return 0;
 }
 
@@ -197,13 +243,8 @@ std::vector<double> loadSampleFromFile(const std::string& filename) {
     while (getline(file, line)) {
         if (line.empty()) continue;
         for (char c : line) {
-            if (c == '0' || c == '1') {
-                input.push_back(c - '0');
-                if (c == '0') std::cout << "⬜";
-                if (c == '1') std::cout << "⬛";
-            }
+            if (c == '0' || c == '1') input.push_back(c - '0');
         }
-        std::cout << std::endl;
     }
 
     file.close();
@@ -216,4 +257,18 @@ void menu(std::string prog_name){
              << prog_name << " train <train_folder> <inputs> <hiddenLayers> <neuronsPerLayer> <outputs>" << std::endl;
         std::cerr << "  For use model: " 
              << prog_name << " predict <model_file> <input_file>" << std::endl;
+}
+
+void drawFigure(std::vector<double>& figure){
+    int k = std::sqrt(figure.size());
+    int tmp = 0;
+    for (size_t i = 0; i < figure.size(); i++){
+        if (figure[i] == 0) std::cout << "⬜";
+        if (figure[i] == 1) std::cout << "⬛";
+        tmp ++;
+        if (tmp == k){
+            tmp = 0;
+            std::cout << std::endl;
+        }
+    }
 }
