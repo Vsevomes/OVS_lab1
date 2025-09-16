@@ -256,7 +256,7 @@ void menu(std::string prog_name){
         std::cerr << "  For train model: " 
              << prog_name << " train <train_folder> <inputs> <hiddenLayers> <neuronsPerLayer> <outputs>" << std::endl;
         std::cerr << "  For use model: " 
-             << prog_name << " predict <model_file> <input_file>" << std::endl;
+             << prog_name << " predict <model_file> <input_folder>" << std::endl;
 }
 
 void drawFigure(std::vector<double>& figure){

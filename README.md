@@ -16,12 +16,13 @@ OVS_lab1/
 ├── CMakeLists.txt # Build configuration
 ├── main.cpp # Main application entry point
 ├── include/ # Header files
-│ └── neural_network.hpp # Neural network class and utilities
+│ └── neural_net.h # Neural network class and utilities
 ├── src/ # Source files
 │ └── neural_network.cpp # Implementation of neural network
 ├── data/ # Dataset files
 │ ├── train/ # Training samples
-│ └── test/ # Test samples
+│ ├── test/ # Test samples
+│ └── model # Neural network model
 └── README.md # Project documentation
 ```
 
@@ -73,11 +74,11 @@ You can use the executable to either train a model or predict using a saved mode
     ./neural_network predict <model_file> <input_file>
     ```
     - <model_file> – path to the saved model file
-    - <input_file> – path to a file containing a single input shape
+    - <input_folder> – folder containing test files
 
     Example:
     ```bash
-    ./neural_network predict model.dat ../data/test/circle_0.txt
+    ./neural_network predict model.dat ../data/test/
     ```
 
 ## Dataset Format
@@ -89,6 +90,7 @@ Each dataset file should contain:
 
 Example:
 ```
+0 0 1
 0 0 0 0 0 0 0
 0 0 0 1 0 0 0
 0 0 1 0 1 0 0
