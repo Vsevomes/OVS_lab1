@@ -56,7 +56,7 @@ You can use the executable to either train a model or predict using a saved mode
 1. Train a Model
 
     ```bash
-    ./neural_network train <train_folder> <num_inputs> <hiddenLayers> <neuronsPerLayer> <num_outputs> <learningRate>
+    ./neural_net train <train_folder> <num_inputs> <hiddenLayers> <neuronsPerLayer> <num_outputs> <learningRate>
     ```
     - <train_folder> – folder containing training files
     - <num_inputs> – number of input neurons (e.g., 49 for 7×7 images)
@@ -67,18 +67,18 @@ You can use the executable to either train a model or predict using a saved mode
 
     Example:
     ```bash
-    ./neural_network train ../data/train 49 1 20 3 0.1
+    ./neural_net train ../data/train/ 49 1 20 3 0.1
     ```
 2. Predict Using a Saved Model
     ```bash
-    ./neural_network predict <model_file> <input_file>
+    ./neural_netw predict <model_file> <input_folder>
     ```
     - <model_file> – path to the saved model file
     - <input_folder> – folder containing test files
 
     Example:
     ```bash
-    ./neural_network predict model.dat ../data/test/
+    ./neural_net predict model.dat ../data/test/
     ```
 
 ## Dataset Format

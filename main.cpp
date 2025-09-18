@@ -56,6 +56,8 @@ int main(int argc, char* argv[]) {
             return 1;
         }
 
+        for (auto& s : samples) drawFigure(s.input);
+
         // training settings
         double err = 1.0;         
         int epoch = 0;
@@ -96,7 +98,7 @@ int main(int argc, char* argv[]) {
     
         std::cout << "Training completed for " << epoch << " epochs, ERR = " << err << std::endl;
         std::cout << "Train time: " << duration_train << " ms" << std::endl;
-        std::cout << "Inference time: " << duration_forward << " mcs" << std::endl;
+        std::cout << "Inference time: " << duration_forward << " μs" << std::endl;
         std::cout << "Memory usage: " << memory_usage << " bites" << std::endl;
 
         std::string save_file = "../data/model";
