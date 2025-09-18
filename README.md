@@ -67,7 +67,7 @@ You can use the executable to either train a model or predict using a saved mode
 
     Example:
     ```bash
-    ./neural_net train ../data/train/ 49 1 20 3 0.1
+    ./neural_net train ../data/train/ 49 1 20 3
     ```
 2. Predict Using a Saved Model
     ```bash
